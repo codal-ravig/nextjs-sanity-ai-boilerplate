@@ -1,0 +1,4 @@
+# Gitleaks fingerprints to ignore, one per line. Format:
+#   <commit>:<file>:<rule-id>:<line>
+# Add an entry only for a credential that has already been rotated and cannot
+# be removed from history. Put a comment above each entry saying why.

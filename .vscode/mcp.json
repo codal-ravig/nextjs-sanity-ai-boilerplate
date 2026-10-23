@@ -1,0 +1,13 @@
+{
+  "inputs": [],
+  "servers": {
+    "figma": {
+      "url": "https://mcp.figma.com/mcp",
+      "type": "http"
+    },
+    "sanity": {
+      "url": "https://mcp.sanity.io",
+      "type": "http"
+    }
+  }
+}

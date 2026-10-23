@@ -1,0 +1,27 @@
+# Gitleaks configuration for this repository.
+#
+# Extends the built-in gitleaks ruleset, so every default rule stays active.
+# Add an allowlist entry here only for a confirmed FALSE POSITIVE (a value that
+# merely looks secret-shaped), and scope it as tightly as possible: an exact
+# regex and an exact path. A broad regex or an unscoped path is how a real
+# secret stops getting caught.
+#
+# A real credential that stays in git history on purpose (already rotated)
+# belongs in .gitleaksignore instead, by fingerprint.
+
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+# Example of a narrowly scoped allowlist entry. Copy, edit and uncomment.
+#
+# [[rules]]
+# id = "generic-api-key"
+#
+#   [[rules.allowlists]]
+#   description = "scripts/example.py assigns `secret = args.secret`, which is read from an env var via argparse; it is not a hardcoded credential."
+#   condition = "AND"
+#   regexTarget = "secret"
+#   regexes = ['''^args\.secret$''']
+#   paths = ['''^scripts/example\.py$''']

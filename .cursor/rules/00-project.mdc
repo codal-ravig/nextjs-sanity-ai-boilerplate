@@ -1,0 +1,6 @@
+---
+description: Project instructions pointer
+alwaysApply: true
+---
+
+The project instructions live in `AGENTS.md` at the repository root. Read it first and follow it. Before writing code, read `docs/architecture.md`. Scoped coding rules are in `.github/instructions/`.

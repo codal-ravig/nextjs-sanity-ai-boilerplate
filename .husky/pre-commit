@@ -1,0 +1,26 @@
+set -e
+
+npx lint-staged
+corepack pnpm lint
+
+# Sanity TypeGen drift check. Skipped until a Sanity config exists. Regenerates
+# in place, then compares against the index: a failure leaves the fresh output
+# in the working tree, ready to stage. Set SANITY_WORKSPACE if your Studio uses
+# more than one workspace.
+if ls sanity.config.* >/dev/null 2>&1; then
+  WORKSPACE="${SANITY_WORKSPACE:-default}"
+  NEXT_PUBLIC_SANITY_PROJECT_ID=ci-placeholder NEXT_PUBLIC_SANITY_DATASET=production \
+    corepack pnpm exec sanity schema extract --workspace "$WORKSPACE" --path sanity/schema.json --force
+  NEXT_PUBLIC_SANITY_PROJECT_ID=ci-placeholder NEXT_PUBLIC_SANITY_DATASET=production \
+    corepack pnpm exec sanity typegen generate
+  if ! git diff --quiet -- sanity/schema.json src/lib/sanity/sanity.types.ts; then
+    git --no-pager diff --stat -- sanity/schema.json src/lib/sanity/sanity.types.ts
+    echo "Sanity schema or generated types are out of date. Review and 'git add sanity/schema.json src/lib/sanity/sanity.types.ts', then commit again."
+    exit 1
+  fi
+fi
+
+corepack pnpm type:check
+corepack pnpm test
+corepack pnpm audit:architecture
+corepack pnpm build

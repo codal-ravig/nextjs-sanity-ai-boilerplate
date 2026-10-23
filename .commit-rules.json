@@ -1,0 +1,17 @@
+{
+  "ticketKeyPattern": "[A-Z][A-Z0-9]{1,9}-\\d+",
+  "conventionalTypes": [
+    "feat",
+    "fix",
+    "hotfix",
+    "chore",
+    "docs",
+    "refactor",
+    "test",
+    "perf",
+    "style",
+    "ci",
+    "build"
+  ],
+  "requireTime": false
+}

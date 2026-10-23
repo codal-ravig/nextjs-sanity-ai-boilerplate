@@ -1,0 +1,119 @@
+name: Security scans
+
+on:
+  # `pull_request_target` runs the workflow definition from the protected base
+  # branch: a PR cannot neuter, remove, or rename its own required-check step
+  # and expect that edited version to be what executes. The job still
+  # explicitly checks out the PR's *head* commit to scan (see that job's
+  # checkout step); only the workflow logic itself is fixed.
+  #
+  # This is safe specifically because the job never builds, installs, or
+  # otherwise executes anything from that checked-out PR content. gitleaks
+  # only pattern-matches text. The dependency audit lives in a separate
+  # plain-`pull_request` workflow because it installs PR-controlled
+  # dependencies and must not receive `pull_request_target` trust.
+  pull_request_target:
+    branches: ["main", "development", "release-*"]
+  push:
+    branches: ["main", "development", "release-*"]
+  schedule:
+    # Daily, independent of any push, so a secret that reaches history any
+    # other way (direct push, admin merge, force-push) does not wait for the
+    # next PR.
+    - cron: "17 4 * * *"
+  workflow_dispatch: {}
+
+# Every job here only reads the repo; none comments on PRs, uploads an
+# artifact, or pushes anything. Least-privilege default for the whole workflow.
+permissions:
+  contents: read
+
+# One concurrency group per workflow *run* (not per job). This only prevents
+# overlapping runs of this workflow piling up, e.g. several rapid pushes to the
+# same branch, or a schedule firing while a push run is still in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: "8.30.1"
+
+jobs:
+  # Required PR check. Scans only the commits introduced by this PR, not the
+  # whole repo history, so it stays fast and blocks a secret before merge.
+  # Triggered by `pull_request_target` (see the `on:` block above) so the
+  # steps below cannot be altered by the PR they are gating.
+  secret-scan-diff:
+    name: Secret scan (PR diff)
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned by major version tag here for readability. For
+      # stronger supply-chain protection, pin each one to a full commit SHA
+      # (with the tag in a trailing comment) and let Dependabot update them.
+      #
+      # `pull_request_target` checks out the *base* branch by default, so
+      # explicitly check out the PR's own head commit, since that is the
+      # content this job needs to scan.
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install gitleaks (checksum-verified)
+        run: |
+          set -euo pipefail
+          asset="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSfL -o "${asset}" "${base_url}/${asset}"
+          curl -sSfL -o checksums.txt "${base_url}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          # Fail closed if the downloaded archive does not match the sha256
+          # the release itself publishes, rather than trusting the bytes a
+          # compromised or tampered-in-transit asset would hand us.
+          grep " ${asset}\$" checksums.txt | sha256sum -c -
+          tar -xzf "${asset}" gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm -f "${asset}" checksums.txt
+          gitleaks version
+
+      # `pull_request_target` fixes the *steps* this job runs. It says nothing
+      # about the *content* of a data file this job reads from the checked-out
+      # (head) tree. The PR still controls .gitleaks.toml at head.sha, so a
+      # required secret-scan gate must not read its allow/deny policy from
+      # there either: a PR could otherwise widen an allowlist to launder its
+      # own leaked secret past the check. Load the config from the PR's base
+      # commit instead, which the PR cannot alter.
+      #
+      # Bootstrap case: the base ref will not have .gitleaks.toml until the PR
+      # that introduces it merges. When that lookup fails, fall back to
+      # gitleaks' built-in default ruleset (no --config) for this run only.
+      - name: Load trusted gitleaks config (from PR base, not PR head)
+        id: trusted-config
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if git show "${BASE_SHA}:.gitleaks.toml" > .gitleaks.trusted.toml 2>/dev/null; then
+            echo "config_args=--config .gitleaks.trusted.toml" >> "$GITHUB_OUTPUT"
+            echo "Loaded .gitleaks.toml from trusted base ${BASE_SHA}."
+          else
+            echo "config_args=" >> "$GITHUB_OUTPUT"
+            echo "No .gitleaks.toml at base ${BASE_SHA} yet (bootstrap): using gitleaks' default ruleset for this run."
+          fi
+
+      - name: Scan PR commits for secrets
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CONFIG_ARGS: ${{ steps.trusted-config.outputs.config_args }}
+        run: |
+          # CONFIG_ARGS is deliberately unquoted so "--config <file>" splits
+          # into two arguments; it is empty on the bootstrap path.
+          gitleaks git \
+            --gitleaks-ignore-path=/dev/null \
+            ${CONFIG_ARGS} \
+            --log-opts="${BASE_SHA}..${HEAD_SHA}" \
+            --redact \
+            --verbose \
+            .

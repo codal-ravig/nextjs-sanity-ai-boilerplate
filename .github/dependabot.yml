@@ -1,0 +1,81 @@
+version: 2
+
+updates:
+  # Dependabot's "npm" ecosystem covers npm, yarn and pnpm, and reads
+  # pnpm-lock.yaml natively.
+  #
+  # No `commit-message` setting on purpose. Without one, Dependabot infers a
+  # prefix from recent commits, and scripts/validate-commit-msg.js exempts
+  # "Bump ..." subjects from the ticket-key requirement. Setting a different
+  # prefix would fail that check on every Dependabot PR.
+  - package-ecosystem: "npm"
+    directory: "/"
+    target-branch: "main" # change to your integration branch
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase-if-necessary
+    labels:
+      - "dependencies"
+    # Packages that only work at matching versions. Bumped one at a time,
+    # each PR fails, so they move together.
+    groups:
+      # Released together; @next/env and eslint-config-next drift ahead of
+      # next when bumped alone.
+      next:
+        patterns:
+          - "next"
+          - "@next/*"
+          - "eslint-config-next"
+      # react-dom throws at load unless react is its exact version.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # @vitest/coverage-* pins one exact vitest.
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "vite"
+      # Released in lockstep. Not "@sanity/*": some @sanity packages (for
+      # example @sanity/image-url) have their own version line.
+      sanity:
+        patterns:
+          - "sanity"
+          - "@sanity/vision"
+      # Lint tooling moves together so a config change lands in one PR.
+      eslint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+    ignore:
+      # @types/node describes the Node runtime, so its major follows the
+      # runtime in .nvmrc, not the newest Node release. Bump it by hand
+      # together with .nvmrc.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Add a rule here for any dependency whose major version needs its own
+      # ticket (breaking API, bundle growth, no test coverage). Say why in a
+      # comment and drop the rule once the migration lands.
+
+  # Keep the actions this repo's own workflows use current and patched.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "main" # change to your integration branch
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      # Upload and download must stay on matching majors, or an artifact
+      # written by one cannot be read by the other.
+      artifact-actions:
+        patterns:
+          - "actions/upload-artifact"
+          - "actions/download-artifact"

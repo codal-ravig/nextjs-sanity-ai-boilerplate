@@ -1,0 +1,49 @@
+# CODEOWNERS: placeholder owners. Replace every @<your-org>/... team below.
+#
+# GitHub auto-requests the listed owner as reviewer on any PR touching a
+# matched path. A PR that touches no owned path is unaffected.
+#
+# NOTE: this only REQUESTS review. To make owner approval REQUIRED for merge,
+# enable "Require review from Code Owners" in the branch ruleset for your
+# default branch. That is a repository setting this file cannot change.
+#
+# Order matters: the LAST matching pattern wins. Keep specific paths below
+# broad ones.
+
+# ---------------------------------------------------------------------------
+# Default owner
+# ---------------------------------------------------------------------------
+*                          @<your-org>/platform
+
+# ---------------------------------------------------------------------------
+# CI/CD and tooling: pipelines, hooks, Dependabot, audit scripts.
+# ---------------------------------------------------------------------------
+/.github/workflows/        @<your-org>/devops
+/.github/dependabot.yml    @<your-org>/devops
+/.husky/                   @<your-org>/devops
+/scripts/                  @<your-org>/platform
+
+# ---------------------------------------------------------------------------
+# Security-sensitive files: secret scanning policy, security rules and agent.
+# ---------------------------------------------------------------------------
+/.gitleaks.toml                       @<your-org>/security
+/.github/rules/security-rules.md      @<your-org>/security
+/.github/agents/security.md           @<your-org>/security
+/.github/instructions/security.instructions.md  @<your-org>/security
+
+# ---------------------------------------------------------------------------
+# Content model: Sanity schema, Studio configuration and generated types.
+# ---------------------------------------------------------------------------
+/sanity/                   @<your-org>/content-platform
+
+# ---------------------------------------------------------------------------
+# Architecture decisions and the AI configuration that encodes them.
+# ---------------------------------------------------------------------------
+/docs/adr/                 @<your-org>/architecture
+/docs/architecture.md      @<your-org>/architecture
+/.github/agents/           @<your-org>/architecture
+/.github/rules/            @<your-org>/architecture
+/.github/instructions/     @<your-org>/architecture
+
+# This file's own ownership.
+/.github/CODEOWNERS        @<your-org>/platform

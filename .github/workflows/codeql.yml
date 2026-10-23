@@ -1,0 +1,45 @@
+name: CodeQL
+
+on:
+  pull_request:
+    branches: ["main", "development", "release-*"]
+  push:
+    branches: ["main", "development", "release-*"]
+  schedule:
+    # Weekly, so newly published queries run against code that has not changed.
+    - cron: "31 5 * * 1"
+  workflow_dispatch: {}
+
+# Least privilege by default. The analyze job adds the one extra scope it
+# needs to upload results to code scanning.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      # Actions are pinned by major version tag here for readability. For
+      # stronger supply-chain protection, pin each one to a full commit SHA
+      # (with the tag in a trailing comment) and let Dependabot update them.
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"

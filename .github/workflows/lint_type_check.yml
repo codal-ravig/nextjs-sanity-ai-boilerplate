@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "development", "release-*"]
+  pull_request:
+    branches: ["main", "development", "release-*"]
+  workflow_dispatch: {}
+
+# One concurrency group per workflow *run* (not per job: jobs within a
+# single run already execute in parallel regardless of this setting). This
+# only prevents overlapping *runs* of this workflow piling up, e.g. several
+# rapid pushes to the same branch. Matches the same pattern in
+# security-scans.yml and dependency-audit.yml.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
+jobs:
+  lint-typecheck-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Actions are pinned by major version tag here for readability. For
+      # stronger supply-chain protection, pin each one to a full commit SHA
+      # (with the tag in a trailing comment) and let Dependabot update them.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # Full history, so "Validate commit messages" can resolve the PR's
+          # base branch. The default shallow clone has no `origin/<base>`.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm run lint
+
+      # Regenerates the Sanity schema extract and TypeGen output, then fails
+      # if that differs from what's committed. The generated types and
+      # `sanity/schema.json` are committed so the type-check step below has
+      # something to check against without a live Sanity project; this is
+      # what keeps them from silently drifting out of date with the schema
+      # or queries. Replace <workspace-name> with your Studio workspace name.
+      - name: Sanity TypeGen drift check
+        env:
+          NEXT_PUBLIC_SANITY_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_SANITY_DATASET: production
+        run: |
+          pnpm exec sanity schema extract --workspace <workspace-name> --path sanity/schema.json --force
+          pnpm exec sanity typegen generate
+          if ! git diff --exit-code -- sanity/schema.json src/lib/sanity/sanity.types.ts; then
+            echo "::error::Sanity schema or generated types are out of date. Run 'pnpm sanity:typegen' and commit the result."
+            exit 1
+          fi
+
+      - name: Run TypeScript type check
+        run: pnpm run type:check
+
+      - name: Run unit tests
+        run: pnpm run test
+
+      - name: Validate commit messages
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          range="origin/${BASE_REF}..HEAD"
+          # Captured before the loop on purpose. Fed through `< <(git log ...)`,
+          # a git failure is swallowed: the loop runs zero times and the step
+          # passes having checked nothing. A failed assignment fails the step.
+          subjects="$(git log --format=%s "$range")"
+          if [ -z "$subjects" ]; then
+            echo "::error::No commits in ${range}; refusing to pass without checking any."
+            exit 1
+          fi
+          msg_file="$(mktemp .commit-msg-lint.XXXXXX)"
+          trap 'rm -f "$msg_file"' EXIT
+          failed=0
+          while IFS= read -r subject; do
+            # The prefix also keeps a subject from starting a line with `::`,
+            # which the runner would read as a workflow command.
+            echo "Checking: ${subject}"
+            printf '%s\n' "$subject" > "$msg_file"
+            node scripts/validate-commit-msg.js "$msg_file" || failed=1
+          done <<< "$subjects"
+          exit "$failed"
+
+      # Invariants ESLint cannot express: patterns that compile and lint
+      # clean but still violate docs/architecture.md.
+      - name: Architecture audit
+        run: pnpm run audit:architecture
+
+      # The build is the only check that exercises the RSC/client boundary,
+      # route collection and `generateStaticParams`. Lint, tsc and unit tests
+      # all pass on code that fails to build: importing a server-only module
+      # into a Client Component is the common way it happens.
+      - name: Build
+        run: pnpm run build
+        env:
+          # Placeholders: the build must not require live credentials. If a
+          # real value is ever needed here, that is a module reading config at
+          # import time rather than per request. Fix that instead of adding
+          # a secret.
+          # The Studio route always needs a projectId to construct its Sanity
+          # client, even when prerendered. Same placeholder value already used
+          # by the TypeGen step above; this is not a live credential.
+          NEXT_PUBLIC_SANITY_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_SANITY_DATASET: production

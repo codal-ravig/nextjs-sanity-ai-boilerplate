@@ -1,0 +1,47 @@
+name: Dependency audit
+
+on:
+  pull_request:
+    branches: ["main", "development", "release-*"]
+  push:
+    branches: ["main", "development", "release-*"]
+  workflow_dispatch: {}
+
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned by major version tag here for readability. For
+      # stronger supply-chain protection, pin each one to a full commit SHA
+      # (with the tag in a trailing comment) and let Dependabot update them.
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      # The audit reads the resolved dependency graph; lifecycle scripts and
+      # pnpmfile hooks are not needed and must not execute PR-controlled code.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
+
+      - name: pnpm audit (high and critical, blocking)
+        run: pnpm audit --audit-level=high
+
+      - name: pnpm audit (moderate and low, report only)
+        if: always()
+        run: pnpm audit --audit-level=moderate || true
