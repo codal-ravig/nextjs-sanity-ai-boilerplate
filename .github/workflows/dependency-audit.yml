@@ -16,8 +16,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # This baseline repo ships config and docs only, with no package.json. The
+  # jobs below only make sense in a project generated from it, so they skip
+  # here instead of failing, and run normally once a package.json exists.
+  detect-app:
+    runs-on: ubuntu-latest
+    outputs:
+      has_app: ${{ steps.check.outputs.has_app }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Detect application
+        id: check
+        run: |
+          if [ -f package.json ]; then echo "has_app=true" >> "$GITHUB_OUTPUT"; else echo "has_app=false" >> "$GITHUB_OUTPUT"; fi
+
   dependency-audit:
     name: Dependency vulnerability audit
+    needs: detect-app
+    if: needs.detect-app.outputs.has_app == 'true'
     runs-on: ubuntu-latest
     steps:
       # Actions are pinned by major version tag here for readability. For
