@@ -6,13 +6,27 @@ Repository: https://github.com/codal-ravig/nextjs-sanity-ai-boilerplate
 
 ## Quick start
 
-1. Create an empty folder for your new project and open your AI agent in it.
-2. Open [`BOOTSTRAP-PROMPT.md`](BOOTSTRAP-PROMPT.md) (on GitHub, or from a clone). Fill in `PROJECT_NAME` and `TICKET_PREFIX`. Leave `BASELINE_PATH` empty and the agent clones this repo for you, or point it at a local clone.
-3. Paste the prompt. The agent prints a plan and waits. Review it, then reply `go`.
-4. The agent scaffolds the app, installs the baseline, runs the checks and reports. You review and commit. The agent never commits or pushes.
-5. Fill in `docs/architecture.md` (source-of-truth table), `.github/CODEOWNERS` and `.env.example`.
+1. Create an empty folder for the new project and open your AI agent in it (Claude Code, Copilot agent mode, Cursor, Codex or Gemini).
+2. Copy the prompt below, change the two values, and paste it.
+3. Read the plan the agent prints, then reply `go`.
+4. Review the result and commit it yourself. The agent never commits or pushes.
 
-Requirements: Node (see `.nvmrc`), Corepack enabled (`corepack enable`), and an AI agent that can read files and run commands.
+```text
+Create a new project from the AI-native Next.js + Sanity baseline.
+
+PROJECT_NAME=my-project
+TICKET_PREFIX=PROJ
+
+1. Clone https://github.com/codal-ravig/nextjs-sanity-ai-boilerplate.git (--depth 1) into a temp folder outside this project.
+2. Read BOOTSTRAP-PROMPT.md in that clone and follow it exactly, using the values above and BASELINE_PATH set to the clone.
+3. Start with its section 0 step 1: print the plan, then wait for my "go".
+```
+
+That is the whole prompt. The detailed instructions live in [`BOOTSTRAP-PROMPT.md`](BOOTSTRAP-PROMPT.md), so they stay in one place and every run uses the current version.
+
+To pin a version, add `BASELINE_REF=v1.0.0` and clone with `--branch v1.0.0`.
+
+Requirements: Node (see `.nvmrc`), Corepack enabled (`corepack enable`), and an agent that can read files and run commands. After it finishes, fill in `docs/architecture.md` (source-of-truth table), `.github/CODEOWNERS` and `.env.example`.
 
 ## Always the latest
 
