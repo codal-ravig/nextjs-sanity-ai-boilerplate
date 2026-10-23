@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment files: only the example is committed
+.env
+.env.*
+!.env.example
+
+# Local AI and tooling state
+CLAUDE.local.md
+.claude/settings.local.json
+.pr-screenshots/
+
+# Test output
+playwright-report/
+test-results/
+
+# Sanity
+.sanity/
+
+# Logs and OS files
+*.log
+.DS_Store
